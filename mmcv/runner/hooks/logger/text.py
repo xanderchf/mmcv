@@ -31,9 +31,11 @@ class TextLoggerHook(LoggerHook):
         return mem_mb.item()
 
     def _log_info(self, log_dict, runner):
+        total_length = len(runner.data_loader) if hasattr(runner, 'data_loader') else \
+                    max(len(d) for d in runner.data_loaders)
         if runner.mode == 'train':
             log_str = 'Epoch [{}][{}/{}]\tlr: {:.5f}, '.format(
-                log_dict['epoch'], log_dict['iter'], len(runner.data_loader),
+                log_dict['epoch'], log_dict['iter'], total_length,
                 log_dict['lr'])
             if 'time' in log_dict.keys():
                 self.time_sec_tot += (log_dict['time'] * self.interval)
@@ -99,7 +101,7 @@ class TextLoggerHook(LoggerHook):
             if torch.cuda.is_available():
                 log_dict['memory'] = self._get_max_memory(runner)
         for name, val in runner.log_buffer.output.items():
-            if name in ['time', 'data_time']:
+            if name in ['time', 'data_time'] or 'vis' in name or 'img' in name:
                 continue
             log_dict[name] = val
 
