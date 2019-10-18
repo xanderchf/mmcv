@@ -1,4 +1,4 @@
-from .runner import Runner
+from .runner import Runner, MTLRunner
 from .log_buffer import LogBuffer
 from .hooks import (Hook, CheckpointHook, ClosureHook, LrUpdaterHook,
                     OptimizerHook, IterTimerHook, DistSamplerSeedHook,
@@ -12,7 +12,7 @@ from .utils import (get_host_info, get_dist_info, master_only, get_time_str,
                     obj_from_dict)
 
 __all__ = [
-    'Runner', 'LogBuffer', 'Hook', 'CheckpointHook', 'ClosureHook',
+    'Runner', 'MTLRunner', 'LogBuffer', 'Hook', 'CheckpointHook', 'ClosureHook',
     'LrUpdaterHook', 'OptimizerHook', 'IterTimerHook', 'DistSamplerSeedHook',
     'LoggerHook', 'TextLoggerHook', 'PaviLoggerHook', 'TensorboardLoggerHook',
     'load_state_dict', 'load_checkpoint', 'weights_to_cpu', 'save_checkpoint',

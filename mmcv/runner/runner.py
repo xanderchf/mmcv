@@ -407,3 +407,82 @@ class Runner(object):
         self.register_hook(IterTimerHook())
         if log_config is not None:
             self.register_logger_hooks(log_config)
+
+
+class MTLRunner(Runner):
+    def __init__(self,
+                 model,
+                 batch_processor,
+                 optimizer=None,
+                 work_dir=None,
+                 log_level=logging.INFO,
+                 logger=None):
+        super(MTLRunner, self).__init__(model, batch_processor, optimizer, work_dir, log_level, logger)
+
+    # MTL training: batch-level round-robin sampling
+    def train(self, data_loaders, **kwargs):
+        self.model.train()
+        self.mode = 'train'
+        self._max_iters = self._max_epochs * max(len(d) for d in data_loaders)
+        self.data_loaders = data_loaders
+        self.call_hook('before_train_epoch')
+        data_iters = [iter(d) for d in self.data_loaders]
+        # length of an epoch: the length of the largest dataset * # datasets
+        for i in range(max(len(d) for d in data_loaders) * len(data_loaders)):
+            self._inner_iter = i
+            # first pick the data loader
+            task_ind = i % len(data_iters)
+            data_ind = i // len(data_iters)
+            try:
+                data_batch = next(data_iters[task_ind])
+            except StopIteration:
+                data_iters[task_ind] = iter(data_loaders[task_ind])
+                data_batch = next(data_iters[task_ind])
+            self.call_hook('before_train_iter')
+            outputs = self.batch_processor(
+                self.model, data_batch, train_mode=True, step=data_ind, **kwargs)
+            if not isinstance(outputs, dict):
+                raise TypeError('batch_processor() must return a dict')
+            if 'log_vars' in outputs:
+                self.log_buffer.update(outputs['log_vars'],
+                                       outputs['num_samples'])
+            if 'img' in outputs:
+                # visualize images and labels
+                self.log_buffer.update(outputs['img'])
+            if 'vis' in outputs:
+                # visualize images and labels
+                self.log_buffer.update(outputs['vis'])
+            self.outputs = outputs
+            self.call_hook('after_train_iter')
+            self._iter += 1
+
+        self.call_hook('after_train_epoch')
+        self._epoch += 1
+
+    # MTL testing
+    def val(self, data_loaders, **kwargs):
+        self.model.eval()
+        self.mode = 'val'
+        for data_loader in data_loaders:
+            self.data_loader = data_loader
+            self.call_hook('before_val_epoch')
+
+
+            for i, data_batch in enumerate(data_loader):
+                self._inner_iter = i
+                self.call_hook('before_val_iter')
+                with torch.no_grad():
+                    outputs = self.batch_processor(
+                        self.model, data_batch, train_mode=False, **kwargs)
+                if not isinstance(outputs, dict):
+                    raise TypeError('batch_processor() must return a dict')
+                if 'log_vars' in outputs:
+                    self.log_buffer.update(outputs['log_vars'],
+                                           outputs['num_samples'])
+                if 'img' in outputs:
+                    # visualize images and labels
+                    self.log_buffer.update(outputs['img'], outputs['vis'])
+                self.outputs = outputs
+                self.call_hook('after_val_iter')
+
+            self.call_hook('after_val_epoch')
