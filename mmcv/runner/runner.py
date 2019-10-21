@@ -423,7 +423,7 @@ class MTLRunner(Runner):
     def train(self, data_loaders, **kwargs):
         self.model.train()
         self.mode = 'train'
-        self._max_iters = self._max_epochs * max(len(d) for d in data_loaders)
+        self._max_iters = self._max_epochs * len(data_loaders) * max(len(d) for d in data_loaders)
         self.data_loaders = data_loaders
         self.call_hook('before_train_epoch')
         data_iters = [iter(d) for d in self.data_loaders]
