@@ -467,7 +467,6 @@ class MTLRunner(Runner):
             self.data_loader = data_loader
             self.call_hook('before_val_epoch')
 
-
             for i, data_batch in enumerate(data_loader):
                 self._inner_iter = i
                 self.call_hook('before_val_iter')
