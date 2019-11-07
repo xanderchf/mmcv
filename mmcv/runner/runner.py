@@ -423,12 +423,12 @@ class MTLRunner(Runner):
     def train(self, data_loaders, **kwargs):
         self.model.train()
         self.mode = 'train'
-        self._max_iters = self._max_epochs * len(data_loaders) * max(len(d) for d in data_loaders)
+        self._max_iters = self._max_epochs * max(len(d) for d in data_loaders)
         self.data_loaders = data_loaders
         self.call_hook('before_train_epoch')
         data_iters = [iter(d) for d in self.data_loaders]
         # length of an epoch: the length of the largest dataset * # datasets
-        for i in range(max(len(d) for d in data_loaders) * len(data_loaders)):
+        for i in range(max(len(d) for d in data_loaders)):
             self._inner_iter = i
             # first pick the data loader
             task_ind = i % len(data_iters)

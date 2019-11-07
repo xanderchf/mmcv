@@ -5,6 +5,10 @@ import torch
 from ...utils import master_only
 from .base import LoggerHook
 import numpy as np
+import matplotlib.pyplot as plt
+from ....image import imdenormalize
+import matplotlib.patches as mpatches
+
 
 PALLETE = np.asarray([
     [0, 0, 0],
@@ -27,6 +31,14 @@ PALLETE = np.asarray([
     [0, 80, 100],
     [0, 0, 230],
     [119, 11, 32]], dtype=np.uint8)
+
+def tensor2imgs(tensor, mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True):
+    num_imgs = tensor.shape[0]
+    mean = np.array(mean, dtype=np.float32)
+    std = np.array(std, dtype=np.float32)
+    img = tensor.transpose(1, 2, 0)
+    return imdenormalize(
+        img, mean, std, to_bgr=to_rgb).astype(np.uint8).transpose(2,0,1)
 
 class WandBLoggerHook(LoggerHook):
 
@@ -52,6 +64,23 @@ class WandBLoggerHook(LoggerHook):
                 'Please run "pip install wandb" to install wandb')
         wandb.init(project=self.project_name, dir=self.log_dir)
 
+    def draw_bbox(self, img, bboxes):
+        shape = img.shape
+        fig = plt.figure(figsize=(16, 9.2), dpi=80)
+        ax = fig.add_axes([0.0, 0.0, 1.0, 1.0], frameon=False)
+        ax.axis('off')
+        plt.imshow(img)
+
+        for bbox in bboxes:
+            x1, y1, x2, y2 = bbox.data.cpu().numpy()
+            ax.add_patch(mpatches.Rectangle(
+                (x1, y1), x2 - x1, y2 - y1,
+                linewidth=3, edgecolor='r', facecolor='none',
+                fill=False, alpha=0.75
+            ))
+        fig.canvas.draw_idle()
+        return np.frombuffer(fig.canvas.get_renderer().buffer_rgba(), np.uint8).reshape((736, 1280, 4))
+
     @master_only
     def log(self, runner):
         try:
@@ -61,6 +90,8 @@ class WandBLoggerHook(LoggerHook):
                 'Please run "pip install wandb" to install wandb')
         for var in runner.log_buffer.output:
             if var.startswith('vis'):
+                if 'info' in var:
+                    continue
                 # log labels
                 indices = runner.log_buffer.output[var] + 1
                 indices[indices == 256] = 0
@@ -69,8 +100,14 @@ class WandBLoggerHook(LoggerHook):
                 ]}, step=runner.iter)
             elif var.startswith('img'):
                 # log images
+                img = tensor2imgs(runner.log_buffer.output[var]).transpose(1, 2, 0)
+                # detection
+                # if 'vis_det_gt_info' in runner.log_buffer.output:
+                #     img = self.draw_bbox(img, runner.log_buffer.output['vis_det_gt_info'][0])
+
+
                 wandb.log({var: [
-                    wandb.Image(np.transpose(runner.log_buffer.output[var], (1, 2, 0)), caption=var)
+                    wandb.Image(img, caption=var)
                 ]}, step=runner.iter)
             else:
                 # log scalar
